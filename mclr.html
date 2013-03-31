@@ -6,7 +6,12 @@
     <script src="coffee-script.js"></script>
     <script src="underscore.js"></script>
     <script src="three.js"></script>
+
     <script>
+/*
+Thanks to Florian Boesch http://codeflow.org/entries/2010/dec/09/minecraft-like-rendering-experiments-in-opengl-4/
+for the inspiration and significant chunks of code.
+*/
 var grad = [
     [1.0,1.0,0.0],[-1.0,1.0,0.0],[1.0,-1.0,0.0],[-1.0,-1.0,0.0],
     [1.0,0.0,1.0],[-1.0,0.0,1.0],[1.0,0.0,-1.0],[-1.0,0.0,-1.0],
@@ -23,9 +28,9 @@ var noise = function(xin, yin, zin){
 
     var F3 = 1.0/3.0,
     s = (xin+yin+zin)*F3,
-    i = xin+s,
-    j = yin+s,
-    k = zin+s,
+    i = Math.floor(xin+s),
+    j = Math.floor(yin+s),
+    k = Math.floor(zin+s),
     G3 = 1.0/6.0,
     t = (i+j+k)*G3,
     X0 = i-t,
@@ -132,6 +137,7 @@ var simplex_noise = function(octaves, x, y, z){
 }
 
     </script>
+
     <script type="text/glsl" id="shlightf">
 varying vec3 vn;
 
@@ -206,7 +212,7 @@ void main()
         renderer.setSize 800, 600
         $("body").append(renderer.domElement)
 
-        s = 4
+        s = 32
         camera.position.z = s * 2.5
 
         idx = (x,y,z,ss) ->
@@ -225,13 +231,17 @@ void main()
 
         #cube = (i % 2 == 0 for i in [1..s*s*s])
         #cube = (Math.random() > 0.2 for i in [1..s*s*s])
+        #cube = [false, true, true, false, true, false, false, true]
+        #cube = [true]
+        #cube = (noise( pos(i)...) > 1.1 for i in [1..s*s*s])
+
         cube = []
         for z in [0..s-1]
           for y in [0..s-1]
             for x in [0..s-1]
-              cube.push (simplex_noise(5,x,y,z) > 6.1)
-        #cube = [false, true, true, false, true, false, false, true]
-        #cube = [true]
+              tv = new THREE.Vector3(x,y,z).add(new THREE.Vector3(s/-2,s/-2,s/-2)).normalize().multiplyScalar(0.5)
+              cube.push noise(tv.x,tv.y,tv.z) > 0.94
+
         console.log cube if s < 5
 
         neigh = (cube,current_index) ->
@@ -249,13 +259,10 @@ void main()
 
         g = new THREE.Geometry()
 
-        for z in [s/-2-0.25..s/2+0.25]
-          for y in [s/-2-0.25..s/2+0.25]
-            for x in [s/-2-0.25..s/2+0.25]
-              g.vertices.push new THREE.Vector3(x,y,z)
-
+        premature_optimization = new THREE.Vector3 s/-2, s/-2, s/-2
         idxvs = (x,y,z) ->
-          idx(x,y,z,s+1)
+          g.vertices.push new THREE.Vector3(x,y,z).add(premature_optimization)
+          g.vertices.length - 1
 
         _.each cube, (e,i,l) ->
           [x,y,z] = pos i
@@ -270,17 +277,10 @@ void main()
                   when 3 then new THREE.Face4 idxvs(x,y+1,z), idxvs(x,y+1,z+1), idxvs(x+1,y+1,z+1), idxvs(x+1,y+1,z)
                   when 4 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y+1,z), idxvs(x+1,y+1,z), idxvs(x+1,y,z)
                   when 5 then new THREE.Face4 idxvs(x,y,z+1), idxvs(x+1,y,z+1), idxvs(x+1,y+1,z+1), idxvs(x,y+1,z+1)
-        #        f.color.setHex Math.random() * 0xffffff
                 g.faces.push f
-
-        #mats = []
-        #_.each g.faces, (e,i,l) -> 
-        #  mats.push new THREE.MeshBasicMaterial { color: Math.random() * 0xffffff }
-        #  e.materialIndex = i
 
         console.log g if s < 5
 
-        #m = new THREE.Mesh g, new THREE.MeshFaceMaterial(mats)
         m = new THREE.Mesh g, new THREE.ShaderMaterial({
           vertexShader: $('#shlightv').text(),
           fragmentShader: $('#shlightf').text(),
