@@ -1,7 +1,7 @@
 <html>
 
   <head>
-    <title>Experiment 7</title>
+    <title>Experiment 8</title>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script src="coffee-script.js"></script>
     <script src="underscore.js"></script>
@@ -110,6 +110,7 @@
 
     <script type="text/glsl" id="shlightf">
 varying vec3 vn;
+varying float occ;
 
 uniform float ScaleFactor;
 
@@ -161,15 +162,22 @@ void main()
       2.0 * C2 * l.L10  * z
   );
 
-  gl_FragColor = vec4(d*0.5, 1.0);
+  //gl_FragColor = vec4(d*occ, 1.0);
+
+  float r = mix(0.05*d.x,d.x,occ);
+  gl_FragColor = vec4(vec3(r), 1.0);
+  //gl_FragColor = vec4(vec3(occ), 1.0);
 }
     </script>
     <script type="text/glsl" id="shlightv">
+attribute float ocv;
 varying vec3 vn;
+varying float occ;
 
 void main()
 {
   vn = normal;
+  occ = ocv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
 }
     </script>
@@ -213,14 +221,14 @@ void main()
             dist.push [Math.cos(phi) * r, y, Math.sin(phi) * r]
           dist
 
-        no_idea = (x,y,z) ->
+        rasterize = (x,y,z) ->
           sx = x*0.2
           sy = y*0.2
           sz = z*0.2
 
-          x = 0.0
-          y = 0.0
-          z = 0.0
+          x = if x < 0 then -1 else 1
+          y = if y < 0 then -1 else 1
+          z = if z < 0 then -1 else 1
 
           cx = 0
           cy = 0
@@ -256,20 +264,47 @@ void main()
           if x in r and y in r and z in r then c[idx x,y,z] = v else false
 
         cube = cube_loop (x,y,z) ->
-          #tv = new THREE.Vector3(x,y,z).repos().normalize() #.multiplyScalar(1.1)
-          #tv = new THREE.Vector3(x,y,z).repos().normalize()#.multiplyScalar(3.0)
-          #tv = new THREE.Vector3(x,y,z).normalize().multiplyScalar(3.0)
           tv = new THREE.Vector3(x,y,z).multiplyScalar(3/s)
           simplex_noise(1,tv.x,tv.y,tv.z) > 1.1
-#          tv =  new THREE.Vector3(x,y,z).repos()
-#          Math.sqrt(tv.x*tv.x+tv.y*tv.y+tv.z*tv.z) < s/2
 
-#        cube = []
-#        rays = sphere_dist 50
-#        rayoffs = (no_idea r... for r in rays)
-#        (place cube, p[0] - nsh, p[1] - nsh, p[2] - nsh, true for p in ray for ray in rayoffs)
+        #place cube,0,0,0,true
+        #place cube,15,15,15,true
+        #console.log lookup(cube,16,15,15)
 
         console.log cube if s < 5
+
+        rays = sphere_dist 50
+        (r.push rasterize(r...), new THREE.Vector3(r...).normalize() for r in rays)
+
+#        cube = []
+#        rayoffs = (rasterize r... for r in rays)
+#        (place cube, p[0] - nsh, p[1] - nsh, p[2] - nsh, true for p in ray for ray in rayoffs)
+
+        tests = [((a,b) -> a < b),((a,b) -> a > b)]
+        maybeabs = [((a) -> Math.abs a),((a) -> a)]
+        extract = [((a) -> a[4].x),((a) -> a[4].y),((a) -> a[4].z)]
+        face_names = ['left','right','top','bottom','back','front']
+
+        calc_occ = (x,y,z) ->
+          return [0,0,0,0,0,0] unless lookup(cube,x,y,z)
+          (r[5] = _.some(lookup cube, x+dx, y+dy, z+dz for [dx,dy,dz] in r[3]) for r in rays)
+          o = []
+          for j in [0..5]
+            jm2 = j % 2
+            fhj = Math.floor j/2
+            t = (r for r in rays when tests[jm2](extract[fhj](r) ,0))
+            o.push (r for r in t when !r[5]) \
+                     .reduce(((m,i) -> m+maybeabs[jm2](extract[fhj](i))),0) \
+                  / t.reduce(((m,i) -> m+maybeabs[jm2](extract[fhj](i))),0)
+          o
+
+        occs_per_node = cube_loop (x,y,z) ->
+          console.log [x,y,z] unless idx(x,y,z) % 1000
+          calc_occ x,y,z
+
+        console.log "tess cube occs", occs_per_node[idx 2,2,15]
+        console.log "tess cube occs", occs_per_node[idx 1,2,15]
+        console.log "tess cube occs", occs_per_node[idx 0,2,15]
 
         neigh = (cube,x,y,z) ->
           vof = (dir, c) ->
@@ -289,6 +324,7 @@ void main()
           g.vertices.push new THREE.Vector3(x,y,z).repos()
           g.vertices.length - 1
 
+        occs_per_vert = []
         cube_loop (x,y,z,i) ->
           if cube[i]
             _.each neigh(cube,x,y,z), (e2,i2) -> 
@@ -301,13 +337,16 @@ void main()
                   when 4 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y+1,z), idxvs(x+1,y+1,z), idxvs(x+1,y,z)
                   when 5 then new THREE.Face4 idxvs(x,y,z+1), idxvs(x+1,y,z+1), idxvs(x+1,y+1,z+1), idxvs(x,y+1,z+1)
                 g.faces.push f
+                for _ in [1..4]
+                  occs_per_vert.push occs_per_node[idx x,y,z][i2]
 
         console.log g if s < 5
 
         m = new THREE.Mesh g, new THREE.ShaderMaterial({
           vertexShader: $('#shlightv').text(),
           fragmentShader: $('#shlightf').text(),
-          uniforms: {ScaleFactor: 1.0}})
+          uniforms: {ScaleFactor: 1.0},
+          attributes: {ocv: {type: 'f', value: occs_per_vert}}})
         scene.add m
 
         g.computeFaceNormals()
