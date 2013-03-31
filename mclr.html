@@ -1,7 +1,7 @@
 <html>
 
   <head>
-    <title>Experiment 9</title>
+    <title>Experiment 10</title>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script src="coffee-script.js"></script>
     <script src="underscore.js"></script>
@@ -193,9 +193,21 @@ void main()
         s = 32
         nsh = s/-2
 
-        idx = (x,y,z,ss) ->
+        idxt = (x,y,z,ss) ->
           ss ||= s
           x + y*ss + z*ss*ss
+
+        idxa = []
+        do ->
+          for x in [0..s-1]
+            idxa[x] = []
+            for y in [0..s-1]
+              idxa[x][y] = []
+              for z in [0..s-1]
+                idxa[x][y][z] = idxt x,y,z
+
+        idx = (x,y,z) ->
+          idxa[x][y][z]
 
         cube_loop = (fn) ->
           r = []
@@ -226,7 +238,6 @@ void main()
           sy = y*0.2
           sz = z*0.2
 
-          #TODO find off by error
           x = if x < 0 then -1 else 1
           y = if y < 0 then -1 else 1
           z = if z < 0 then -1 else 1
@@ -257,12 +268,20 @@ void main()
         camera.position.z = s * 2.5
 
         lookup = (c,x,y,z) ->
-          r = [0..s-1]
-          if x in r and y in r and z in r then c[idx x,y,z] else false
+          if (x >= 0 and x < s) and (y >= 0 and y < s) and (z >= 0 and z < s) then c[idx x,y,z] else false
 
         place = (c,x,y,z,v) ->
           r = [0..s-1]
           if x in r and y in r and z in r then c[idx x,y,z] = v else false
+
+        neigh = _.memoize (cube,x,y,z) ->
+          n = [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]]
+          (lookup cube, i... for i in n)
+        , ((c,x,y,z) -> [x,y,z].join())
+
+#        neigh =  (cube,x,y,z) ->
+#          n = [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]]
+#          (lookup cube, i... for i in n)
 
         cube = cube_loop (x,y,z) ->
           tv = new THREE.Vector3(x,y,z).multiplyScalar(3/s)
@@ -273,6 +292,18 @@ void main()
         #console.log lookup(cube,16,15,15)
 
         console.log cube if s < 5
+
+        burieda = []
+        do ->
+          for x in [0..s-1]
+            burieda[x] = []
+            for y in [0..s-1]
+              burieda[x][y] = []
+              for z in [0..s-1]
+                burieda[x][y][z] = _.all(neigh(cube,x,y,z))
+
+        buried = (x,y,z) ->
+          burieda[x][y][z]
 
         rays = sphere_dist 500
         (r.push rasterize(r...), new THREE.Vector3(r...).normalize() for r in rays)
@@ -285,18 +316,21 @@ void main()
         maybeabs = [((a) -> Math.abs a),((a) -> a)]
         extract = [((a) -> a[4].x),((a) -> a[4].y),((a) -> a[4].z)]
         face_names = ['left','right','top','bottom','back','front']
+        jm2fhj = ([j, j % 2, Math.floor j/2] for j in [0..5])
 
         calc_occ = (x,y,z) ->
-          return [0,0,0,0,0,0] unless lookup(cube,x,y,z)
-          (r[5] = _.some(lookup cube, x+dx, y+dy, z+dz for [dx,dy,dz] in r[3]) for r in rays)
+          return [0,0,0,0,0,0] if !lookup(cube,x,y,z) or buried(x,y,z)
           o = []
-          for j in [0..5]
-            jm2 = j % 2
-            fhj = Math.floor j/2
-            t = (r for r in rays when tests[jm2](extract[fhj](r) ,0))
-            o.push (r for r in t when !r[5]) \
-                     .reduce(((m,i) -> m+maybeabs[jm2](extract[fhj](i))),0) \
-                  / t.reduce(((m,i) -> m+maybeabs[jm2](extract[fhj](i))),0)
+          for [k, jm2, fhj] in jm2fhj
+            total = escaped = 0
+            for r in rays
+              r[5] = _.some(lookup cube, x+dx, y+dy, z+dz for [dx,dy,dz] in r[3]) if k == 0
+              j = extract[fhj](r)
+              if tests[jm2](j,0)
+                i = maybeabs[jm2](j)
+                total += i
+                escaped += i unless r[5]
+            o.push escaped/total
           o
 
         occs_per_node = cube_loop (x,y,z) ->
@@ -306,13 +340,6 @@ void main()
         console.log "tess cube occs", occs_per_node[idx 2,2,15]
         console.log "tess cube occs", occs_per_node[idx 1,2,15]
         console.log "tess cube occs", occs_per_node[idx 0,2,15]
-
-        neigh = (cube,x,y,z) ->
-          vof = (dir, c) ->
-            oob = (c[dir] < 0 or c[dir] >= s)
-            if oob then false else lookup cube, c...
-          n = [[0,[x-1,y,z]],[0,[x+1,y,z]],[1,[x,y-1,z]],[1,[x,y+1,z]],[2,[x,y,z-1]],[2,[x,y,z+1]]]
-          (vof i... for i in n)
 
         tp = [0,0,0]
         console.log "cube @ ", tp, lookup(cube,tp...)
