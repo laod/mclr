@@ -1,7 +1,7 @@
 <html>
 
   <head>
-    <title>Experiment 12</title>
+    <title>Experiment 13</title>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script src="coffee-script.js"></script>
     <script src="underscore.js"></script>
@@ -196,29 +196,35 @@ void main()
 uniform sampler2D t;
 varying vec2 cu;
 uniform vec3 rayoffs[64];
+uniform float s;
+uniform float ts;
 
-/*
-vec3 lookup(vec3 c)
+vec4 lookup(vec3 c)
 {
-  float idx = c.x + c.y * 64. + c.z * 64.0
-  float in1 = floor(idx/512.0);
-  float in2 = floor(in1/512.0);
-  vec3 newc = vec3(idx % in2, idx - 
-  return texture2D(t,cu);
+  float slices = ts / s;
+  vec2 newc = vec2(c.x +   mod(c.z,  slices) * s,
+                   c.y + floor(c.z / slices) * s);
+  return texture2D(t,newc/ts);
 }
-*/
 
 void main()
 {
-    gl_FragColor = texture2D(t,cu);
-/*
-    float scale = 1.0/64.0;
-    vec3 c;
-    for(int i = 0; i < 64; i++){
-      c += normalize(rayoffs[i]);
+    vec2 cu2 = cu * s;
+    vec4 doi = lookup(vec3(floor(cu2.x),
+                           floor(cu2.y),
+                           33.0));
+    float c = 0.8;
+    if(doi.x == 0.0){
+      for(int r=0;r < 64;r++){
+        vec3 cl = vec3(cu2,33.0) + rayoffs[r];
+        if(cl.x < 0.0 || cl.x > 64.0) break;
+        if(cl.y < 0.0 || cl.y > 64.0) break;
+        if(cl.z < 0.0 || cl.z > 64.0) break;
+        vec4 doi2 = lookup(cl);
+        if(doi2.x == 0.0){ c = 0.4; break; }
+      }
     }
-    gl_FragColor = vec4(c * scale,1.0);
-*/
+    gl_FragColor = doi + c;
 }
     </script>
 
@@ -402,7 +408,11 @@ void main()
 
           rs = (new THREE.Vector3 roffs... for roffs in rays[0][3])
           m = new THREE.Mesh g, new THREE.ShaderMaterial({
-            uniforms: {t: {type: 't', value: t}, rayoffs: {type: 'v3v', value: rs}},
+            uniforms: {
+              t: {type: 't', value: t},
+              s: {type: 'f', value: s},
+              ts: {type: 'f', value: 512},
+              rayoffs: {type: 'v3v', value: rs}},
             vertexShader: $('#occv').text(),
             fragmentShader: $('#occf').text()})
           sc.add m
