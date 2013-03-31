@@ -1,0 +1,106 @@
+<html>
+
+  <head>
+    <title>Experiment 3</title>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="coffee-script.js"></script>
+    <script src="underscore.js"></script>
+    <script src="three.js"></script>
+    <script type="text/coffeescript">
+      $ ->
+        renderer = new THREE.WebGLRenderer()
+        camera = new THREE.PerspectiveCamera 45, 400/300, 0.1, 10000
+        scene = new THREE.Scene()
+        renderer.setClearColor new THREE.Color(0, 1)
+        renderer.setSize 400, 300
+        $("body").append(renderer.domElement)
+
+        s = 16
+        camera.position.z = s * 2.5
+
+        idx = (x,y,z,ss) ->
+          ss ||= s
+          x + y*ss + z*ss*ss
+
+        pos = (idx) ->
+          z = Math.floor idx/(s*s)
+          y = Math.floor (idx - z * (s*s))/s
+          x = idx - y*s - z*s*s
+          [x,y,z]
+
+        #for i in [0..s*s*s-1]
+        #  console.log pos(i)
+        #  console.log idx(pos(i)...)
+
+        #cube = (i % 2 == 0 for i in [1..s*s*s])
+        cube = (Math.random() > 0.2 for i in [1..s*s*s])
+        #cube = [false, true, true, false, true, false, false, true]
+        #cube = [true]
+        console.log cube if s < 5
+
+        neigh = (cube,current_index) ->
+          [x,y,z] = pos current_index
+          vof = (dir, c) ->
+            oob = (c[dir] < 0 or c[dir] >= s)
+            if oob then true else cube[idx(c...)]
+          n = [[0,[x-1,y,z]],[0,[x+1,y,z]],[1,[x,y-1,z]],[1,[x,y+1,z]],[2,[x,y,z-1]],[2,[x,y,z+1]]]
+          (vof i... for i in n)
+
+        tp = [0,0,0]
+        console.log "cube @ ", tp, cube[idx(tp...)]
+        console.log "idx @ ", tp, idx(tp...)
+        console.log "neigh @ ", tp, neigh(cube,idx(tp...))
+
+        g = new THREE.Geometry()
+
+        for z in [s/-2-0.25..s/2+0.25]
+          for y in [s/-2-0.25..s/2+0.25]
+            for x in [s/-2-0.25..s/2+0.25]
+              g.vertices.push new THREE.Vector3(x,y,z)
+
+        idxvs = (x,y,z) ->
+          idx(x,y,z,s+1)
+
+        _.each cube, (e,i,l) ->
+          [x,y,z] = pos i
+          console.log [x,y,z], e, neigh(l,i) if s < 5
+          unless e
+            _.each neigh(l,i), (e2,i2,l2) -> 
+              if e2
+                f = switch i2
+                  when 0 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y,z+1), idxvs(x,y+1,z+1), idxvs(x,y+1,z)
+                  when 1 then new THREE.Face4 idxvs(x+1,y,z), idxvs(x+1,y+1,z), idxvs(x+1,y+1,z+1), idxvs(x+1,y,z+1)
+                  when 2 then new THREE.Face4 idxvs(x,y,z), idxvs(x+1,y,z), idxvs(x+1,y,z+1), idxvs(x,y,z+1)
+                  when 3 then new THREE.Face4 idxvs(x,y+1,z), idxvs(x,y+1,z+1), idxvs(x+1,y+1,z+1), idxvs(x+1,y+1,z)
+                  when 4 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y+1,z), idxvs(x+1,y+1,z), idxvs(x+1,y,z)
+                  when 5 then new THREE.Face4 idxvs(x,y,z+1), idxvs(x+1,y,z+1), idxvs(x+1,y+1,z+1), idxvs(x,y+1,z+1)
+        #        f.color.setHex Math.random() * 0xffffff
+                g.faces.push f
+
+        #mats = []
+        #_.each g.faces, (e,i,l) -> 
+        #  mats.push new THREE.MeshBasicMaterial { color: Math.random() * 0xffffff }
+        #  e.materialIndex = i
+
+        console.log g if s < 5
+
+        #m = new THREE.Mesh g, new THREE.MeshFaceMaterial(mats)
+        m = new THREE.Mesh g, new THREE.MeshBasicMaterial
+        scene.add m
+
+        doit = (t) ->
+          u = t/500
+          camera.position.x = s * Math.sin u
+          camera.position.y = s * Math.cos u
+          camera.lookAt scene.position
+          renderer.render scene, camera
+          requestAnimationFrame doit
+
+        doit()
+
+    </script>
+  </head>
+
+  <body>
+  </body>
+</html>
