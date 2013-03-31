@@ -23,7 +23,7 @@
       dot = (x, y, z, g) ->
           x*g[0] + y*g[1] + z*g[2]
       
-      noise = (xin, yin, zin) ->
+      window.noise = (xin, yin, zin) ->
 
         F3 = 1.0/3.0
         s = (xin+yin+zin)*F3
@@ -190,7 +190,7 @@ void main()
         renderer.setSize 800, 600
         $("body").append(renderer.domElement)
 
-        s = 32
+        s = 128
         nsh = s/-2
 
         idxt = (x,y,z,ss) ->
@@ -283,9 +283,27 @@ void main()
 #          n = [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]]
 #          (lookup cube, i... for i in n)
 
+        #console.log 1/s
         cube = cube_loop (x,y,z) ->
-          tv = new THREE.Vector3(x,y,z).multiplyScalar(3/s)
-          simplex_noise(1,tv.x,tv.y,tv.z) > 1.1
+          tv = new THREE.Vector3(x,y,z).multiplyScalar(1/s)
+          tv3 = new THREE.Vector3(tv.x+1,tv.y+1,tv.z+1).multiplyScalar(3)
+          tv5 = tv.clone().multiplyScalar(5)
+          #console.log tv,tv3,tv5 unless idx(x,y,z) % 1000
+
+          if tv.y <= 0.8
+            plateau_falloff = 1.0
+          else if tv.y > 0.8 and tv.y < 0.9
+            plateau_falloff = 1.0-(tv.y-0.8)*10.0
+          else
+            plateau_falloff = 0.0
+
+          center_falloff = 0.1/(Math.pow((tv.x-0.5)*1.5, 2) + Math.pow((tv.y-1.0)*0.8, 2) + Math.pow((tv.z-0.5)*1.5, 2))
+  
+          caves = Math.pow simplex_noise(1, tv5.x, tv5.y, tv5.z), 3
+          #console.log caves unless idx(x,y,z) % 1000
+          density = simplex_noise(5,tv.x,tv.y/2,tv.z) * plateau_falloff * center_falloff * Math.pow(simplex_noise(1, tv3.x, tv3.y, tv3.z)+0.4, 1.8)
+          density = 0 if caves < 0.5
+          density > 3.1
 
         #place cube,0,0,0,true
         #place cube,15,15,15,true
@@ -334,17 +352,17 @@ void main()
           o
 
         occs_per_node = cube_loop (x,y,z) ->
-          console.log [x,y,z] unless idx(x,y,z) % 1000
+          #console.log [x,y,z] unless idx(x,y,z) % 1000
           calc_occ x,y,z
 
-        console.log "tess cube occs", occs_per_node[idx 2,2,15]
-        console.log "tess cube occs", occs_per_node[idx 1,2,15]
-        console.log "tess cube occs", occs_per_node[idx 0,2,15]
+        #console.log "tess cube occs", occs_per_node[idx 2,2,15]
+        #console.log "tess cube occs", occs_per_node[idx 1,2,15]
+        #console.log "tess cube occs", occs_per_node[idx 0,2,15]
 
         tp = [0,0,0]
-        console.log "cube @ ", tp, lookup(cube,tp...)
-        console.log "idx @ ", tp, idx(tp...)
-        console.log "neigh @ ", tp, neigh(cube,tp...)
+        #console.log "cube @ ", tp, lookup(cube,tp...)
+        #console.log "idx @ ", tp, idx(tp...)
+        #console.log "neigh @ ", tp, neigh(cube,tp...)
 
         g = new THREE.Geometry()
 
