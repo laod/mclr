@@ -118,13 +118,10 @@ void main()
 
         g = new THREE.Geometry()
 
-        for z in [s/-2-0.25..s/2+0.25]
-          for y in [s/-2-0.25..s/2+0.25]
-            for x in [s/-2-0.25..s/2+0.25]
-              g.vertices.push new THREE.Vector3(x,y,z)
-
+        premature_optimization = new THREE.Vector3 s/-2, s/-2, s/-2
         idxvs = (x,y,z) ->
-          idx(x,y,z,s+1)
+          g.vertices.push new THREE.Vector3(x,y,z).add(premature_optimization)
+          g.vertices.length - 1
 
         _.each cube, (e,i,l) ->
           [x,y,z] = pos i
@@ -139,17 +136,10 @@ void main()
                   when 3 then new THREE.Face4 idxvs(x,y+1,z), idxvs(x,y+1,z+1), idxvs(x+1,y+1,z+1), idxvs(x+1,y+1,z)
                   when 4 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y+1,z), idxvs(x+1,y+1,z), idxvs(x+1,y,z)
                   when 5 then new THREE.Face4 idxvs(x,y,z+1), idxvs(x+1,y,z+1), idxvs(x+1,y+1,z+1), idxvs(x,y+1,z+1)
-        #        f.color.setHex Math.random() * 0xffffff
                 g.faces.push f
-
-        #mats = []
-        #_.each g.faces, (e,i,l) -> 
-        #  mats.push new THREE.MeshBasicMaterial { color: Math.random() * 0xffffff }
-        #  e.materialIndex = i
 
         console.log g if s < 5
 
-        #m = new THREE.Mesh g, new THREE.MeshFaceMaterial(mats)
         m = new THREE.Mesh g, new THREE.ShaderMaterial({
           vertexShader: $('#shlightv').text(),
           fragmentShader: $('#shlightf').text(),
