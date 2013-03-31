@@ -1,7 +1,7 @@
 <html>
 
   <head>
-    <title>Experiment 5</title>
+    <title>Experiment 6</title>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script src="coffee-script.js"></script>
     <script src="underscore.js"></script>
@@ -213,63 +213,111 @@ void main()
         $("body").append(renderer.domElement)
 
         s = 32
-        camera.position.z = s * 2.5
+        nsh = s/-2
 
         idx = (x,y,z,ss) ->
           ss ||= s
           x + y*ss + z*ss*ss
 
-        pos = (idx) ->
-          z = Math.floor idx/(s*s)
-          y = Math.floor (idx - z * (s*s))/s
-          x = idx - y*s - z*s*s
-          [x,y,z]
+        cube_loop = (fn) ->
+          r = []
+          for z in [0..s-1]
+            for y in [0..s-1]
+              for x in [0..s-1]
+                r.push fn(x,y,z,idx(x,y,z))
+          r
 
-        #for i in [0..s*s*s-1]
-        #  console.log pos(i)
-        #  console.log idx(pos(i)...)
+        do ->
+          v = new THREE.Vector3(nsh,nsh,nsh)
+          THREE.Vector3.prototype.repos = _.partial(THREE.Vector3.prototype.add, v)
 
-        #cube = (i % 2 == 0 for i in [1..s*s*s])
-        #cube = (Math.random() > 0.2 for i in [1..s*s*s])
-        #cube = [false, true, true, false, true, false, false, true]
-        #cube = [true]
-        #cube = (noise( pos(i)...) > 1.1 for i in [1..s*s*s])
+        #http://www.softimageblog.com/archives/115
+        sphere_dist = (n) ->
+          dist = []
+          inc = Math.PI * (3 - Math.sqrt 5)
+          o = 2/n
+          for i in [1..n]
+            y = i * o - 1 + (o/2)
+            r = Math.sqrt(1) - y*y
+            phi = i * inc
+            dist.push [Math.cos(phi) * r, y, Math.sin(phi) * r]
+          dist
+
+        no_idea = (x,y,z) ->
+          sx = x*0.2
+          sy = y*0.2
+          sz = z*0.2
+
+          x = 0.0
+          y = 0.0
+          z = 0.0
+
+          cx = 0
+          cy = 0
+          cz = 0
+
+          points = []
+
+          while points.length < s
+              ncx = Math.floor x
+              ncy = Math.floor y
+              ncz = Math.floor z
+              if ncx != cx or ncy != cy or ncz != cz
+                  depth = Math.sqrt x*x+y*y+z*z
+                  cx = ncx
+                  cy = ncy
+                  cz = ncz
+                  #points.push [depth, cx, cy, cz]
+                  points.push [cx, cy, cz]
+              x+=sx
+              y+=sy
+              z+=sz
+
+          points
+
+        camera.position.z = s * 2.5
+
+        lookup = (c,x,y,z) ->
+          r = [0..s-1]
+          if x in r and y in r and z in r then c[idx x,y,z] else false
+
+        place = (c,x,y,z,v) ->
+          r = [0..s-1]
+          if x in r and y in r and z in r then c[idx x,y,z] = v else false
+
+        cube = cube_loop (x,y,z) ->
+          tv = new THREE.Vector3(x,y,z).repos().normalize() #.multiplyScalar(1.1)
+          noise(tv.x,tv.y,tv.z) > 1.1
 
         cube = []
-        for z in [0..s-1]
-          for y in [0..s-1]
-            for x in [0..s-1]
-              tv = new THREE.Vector3(x,y,z).add(new THREE.Vector3(s/-2,s/-2,s/-2)).normalize().multiplyScalar(0.5)
-              cube.push noise(tv.x,tv.y,tv.z) > 0.94
+        rays = sphere_dist 50
+        rayoffs = (no_idea r... for r in rays)
+        (place cube, p[0] - nsh, p[1] - nsh, p[2] - nsh, true for p in ray for ray in rayoffs)
 
         console.log cube if s < 5
 
-        neigh = (cube,current_index) ->
-          [x,y,z] = pos current_index
+        neigh = (cube,x,y,z) ->
           vof = (dir, c) ->
             oob = (c[dir] < 0 or c[dir] >= s)
-            if oob then true else cube[idx(c...)]
+            if oob then false else lookup cube, c...
           n = [[0,[x-1,y,z]],[0,[x+1,y,z]],[1,[x,y-1,z]],[1,[x,y+1,z]],[2,[x,y,z-1]],[2,[x,y,z+1]]]
           (vof i... for i in n)
 
         tp = [0,0,0]
-        console.log "cube @ ", tp, cube[idx(tp...)]
+        console.log "cube @ ", tp, lookup(cube,tp...)
         console.log "idx @ ", tp, idx(tp...)
-        console.log "neigh @ ", tp, neigh(cube,idx(tp...))
+        console.log "neigh @ ", tp, neigh(cube,tp...)
 
         g = new THREE.Geometry()
 
-        premature_optimization = new THREE.Vector3 s/-2, s/-2, s/-2
         idxvs = (x,y,z) ->
-          g.vertices.push new THREE.Vector3(x,y,z).add(premature_optimization)
+          g.vertices.push new THREE.Vector3(x,y,z).repos()
           g.vertices.length - 1
 
-        _.each cube, (e,i,l) ->
-          [x,y,z] = pos i
-          console.log [x,y,z], e, neigh(l,i) if s < 5
-          unless e
-            _.each neigh(l,i), (e2,i2,l2) -> 
-              if e2
+        cube_loop (x,y,z,i) ->
+          if cube[i]
+            _.each neigh(cube,x,y,z), (e2,i2) -> 
+              unless e2
                 f = switch i2
                   when 0 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y,z+1), idxvs(x,y+1,z+1), idxvs(x,y+1,z)
                   when 1 then new THREE.Face4 idxvs(x+1,y,z), idxvs(x+1,y+1,z), idxvs(x+1,y+1,z+1), idxvs(x+1,y,z+1)
@@ -291,15 +339,16 @@ void main()
         g.computeVertexNormals()
         g.normalsNeedUpdate = true
 
+        precalc = ([s * Math.sin(i), s * Math.cos(i)] for i in [0.0..2*Math.PI] by 0.005)
         doit = (t) ->
-          u = t/500
-          camera.position.x = s * Math.sin u
-          camera.position.y = s * Math.cos u
+          u = precalc[Math.floor(t % precalc.length)] or [0,1]
+          camera.position.x = u[0]
+          camera.position.y = u[1]
           camera.lookAt scene.position
           renderer.render scene, camera
           requestAnimationFrame doit
 
-        doit()
+        doit 0
 
     </script>
   </head>
