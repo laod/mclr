@@ -207,16 +207,19 @@ vec4 lookup(vec3 c)
   return texture2D(t,newc/ts);
 }
 
+vec3 to_xyz(vec2 cu)
+{
+  return vec3(mod(cu.x, s), mod(cu.y, s), floor(cu.x / s) + floor(cu.y / s) * ts / s);
+}
+
 void main()
 {
-    vec2 cu2 = cu * s;
-    vec4 doi = lookup(vec3(floor(cu2.x),
-                           floor(cu2.y),
-                           33.0));
+    vec3 cu2 = to_xyz(cu * ts);
+    vec4 doi = lookup(cu2);
     float c = 0.8;
     if(doi.x == 0.0){
       for(int r=0;r < 64;r++){
-        vec3 cl = vec3(cu2,33.0) + rayoffs[r];
+        vec3 cl = cu2 + rayoffs[r];
         if(cl.x < 0.0 || cl.x > 64.0) break;
         if(cl.y < 0.0 || cl.y > 64.0) break;
         if(cl.z < 0.0 || cl.z > 64.0) break;
@@ -235,7 +238,7 @@ void main()
         scene = new THREE.Scene()
         renderer.setClearColor new THREE.Color(0, 1)
         renderer.setSize 800, 600
-        #$("body").append(renderer.domElement)
+        $("body").append(renderer.domElement)
 
         s = 64
         nsh = s/-2
@@ -377,6 +380,7 @@ void main()
 
 
 
+        occs_per_node = []
         do ->
           r = new THREE.WebGLRenderer({preserveDrawingBuffer: true})
           r.setSize 512, 512
@@ -421,50 +425,45 @@ void main()
           tgt.width = tgt.height = s
           output = new Uint8Array 512*512*4
 
-          for ray in [rays[0]]
-            rs = (new THREE.Vector3 roffs... for roffs in ray[3])
-            console.log rs
+          console.log m
 
-            r.render sc, camera
+          tests = [((a,b) -> a < b),((a,b) -> a > b)]
+          maybeabs = [((a) -> Math.abs a),((a) -> a)]
+          extract = [((a) -> a[4].x),((a) -> a[4].y),((a) -> a[4].z)]
+          face_names = ['left','right','top','bottom','back','front']
+          jm2fhj = ([j, j % 2, Math.floor j/2] for j in [0..5])
+
+          occ = []
+          for cube_index in [0..s*s*s-1]
+            occ.push [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
+
+          for ray,ray_index in rays
+            console.log "ray:", ray_index
+            rs = (new THREE.Vector3 roffs... for roffs in ray[3])
+            m.material.uniforms.rayoffs.value = rs
 
             r.render sc, camera, tgt
             gl.readPixels(0,0,512,512,gl.RGBA,gl.UNSIGNED_BYTE,output)
-            console.log output
+
+            for comp,l in output
+              unless l%4
+                for [k, jm2, fhj],face_index in jm2fhj
+                  j = extract[fhj](ray)
+                  if tests[jm2](j,0)
+                    contrib = maybeabs[jm2](j)
+                    occ[l/4][face_index][0] += contrib
+                    occ[l/4][face_index][1] += contrib unless comp > 127 and comp < 255
+
+          for cube_faces in occ
+            t = []
+            for face in cube_faces
+              t.push face[1]/face[0]
+            occs_per_node.push t
 
 
 
 
 
-
-
-#        cube = []
-#        rayoffs = (rasterize r... for r in rays)
-#        (place cube, p[0] - nsh, p[1] - nsh, p[2] - nsh, true for p in ray for ray in rayoffs)
-
-        tests = [((a,b) -> a < b),((a,b) -> a > b)]
-        maybeabs = [((a) -> Math.abs a),((a) -> a)]
-        extract = [((a) -> a[4].x),((a) -> a[4].y),((a) -> a[4].z)]
-        face_names = ['left','right','top','bottom','back','front']
-        jm2fhj = ([j, j % 2, Math.floor j/2] for j in [0..5])
-
-        calc_occ = (x,y,z) ->
-          return [0,0,0,0,0,0]# if !lookup(cube,x,y,z) or buried(x,y,z)
-          o = []
-          for [k, jm2, fhj] in jm2fhj
-            total = escaped = 0
-            for r in rays
-              r[5] = _.some(lookup cube, x+dx, y+dy, z+dz for [dx,dy,dz] in r[3]) if k == 0
-              j = extract[fhj](r)
-              if tests[jm2](j,0)
-                i = maybeabs[jm2](j)
-                total += i
-                escaped += i unless r[5]
-            o.push escaped/total
-          o
-
-        occs_per_node = cube_loop (x,y,z) ->
-          #console.log [x,y,z] unless idx(x,y,z) % 1000
-          calc_occ x,y,z
 
         #console.log "tess cube occs", occs_per_node[idx 2,2,15]
         #console.log "tess cube occs", occs_per_node[idx 1,2,15]
