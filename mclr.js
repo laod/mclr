@@ -124,7 +124,7 @@
   };
 
   $(function() {
-    var Ray, Sponge, calc_occs, camera, doit, g, i, idx, idxvs, m, nsh, occs_per_node, occs_per_vert, precalc, rays, renderer, s, scene, sphere_dist, sponge, ts, xx, yy, zz;
+    var Ray, Sponge, calc_occs, camera, doit, dx, dy, g, i, idx, idxvs, last, m, nsh, occs_per_node, occs_per_vert, pos, precalc, rays, renderer, s, samples, scene, sphere_dist, sponge, track, ts, up, update_deltas, xx, yy, zz;
 
     renderer = new THREE.WebGLRenderer();
     camera = new THREE.PerspectiveCamera(45, 400 / 300, 0.1, 10000);
@@ -527,6 +527,8 @@
           return xx = -1;
         case 68:
           return xx = 1;
+        case 32:
+          return yy = 1;
       }
     });
     $('body').keyup(function(e) {
@@ -539,8 +541,37 @@
           return xx = 0;
         case 68:
           return xx = 0;
+        case 32:
+          return yy = 0;
       }
     });
+    track = false;
+    last = pos = [0, 0];
+    dx = dy = 0;
+    $('body').mousedown(function(e) {
+      return track = true;
+    });
+    $('body').mouseup(function(e) {
+      return track = false;
+    });
+    $('body').mousemove(function(e) {
+      last = pos;
+      return pos = [e.screenX, e.screenY];
+    });
+    samples = 0;
+    update_deltas = function() {
+      samples++;
+      if (track) {
+        if (!(samples % 10)) {
+          return;
+        }
+        dx = (last[0] - pos[0]) / (last[0] - pos[0] * 3);
+        return dy = (last[1] - pos[1]) / (last[1] - pos[1] * 3);
+      } else {
+        return dx = dy = 0;
+      }
+    };
+    up = new THREE.Vector3(0, 1, 0);
     precalc = (function() {
       var _i, _ref, _results;
 
@@ -555,11 +586,18 @@
 
       u = precalc[Math.floor(t % precalc.length)] || [0, 1];
       if (xx) {
-        camera.position.x += xx;
+        camera.translateX(xx);
+      }
+      if (yy) {
+        camera.translateY(yy);
       }
       if (zz) {
-        camera.position.z += zz;
+        camera.translateZ(zz);
       }
+      update_deltas();
+      camera.up = camera.worldToLocal(up);
+      camera.rotation.setX(camera.rotation.x + dy);
+      camera.rotation.setY(camera.rotation.y + dx);
       renderer.render(scene, camera);
       return requestAnimationFrame(doit);
     };

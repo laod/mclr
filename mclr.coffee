@@ -400,19 +400,46 @@ $ ->
       when 83 then zz = 1
       when 65 then xx = -1
       when 68 then xx = 1
+      when 32 then yy = 1
   $('body').keyup (e) ->
     switch e.which
       when 87 then zz = 0
       when 83 then zz = 0
       when 65 then xx = 0
       when 68 then xx = 0
+      when 32 then yy = 0
+  track = false
+  last = pos = [0,0]
+  dx = dy = 0
+  $('body').mousedown (e) ->
+    track = true;
+  $('body').mouseup (e) ->
+    track = false;
+  $('body').mousemove (e) ->
+    last = pos
+    pos = [e.screenX,e.screenY]
 
+  samples = 0
+  update_deltas = ->
+    samples++
+    if track
+      return unless samples % 10
+      dx = (last[0] - pos[0]) / (last[0] - pos[0] * 3)
+      dy = (last[1] - pos[1]) / (last[1] - pos[1] * 3)
+    else
+      dx = dy = 0
+
+  up = new THREE.Vector3(0,1,0)
   precalc = ([s * Math.sin(i), s * Math.cos(i)] for i in [0.0..2*Math.PI] by 0.0025)
   doit = (t) ->
     u = precalc[Math.floor(t % precalc.length)] or [0,1]
-    camera.position.x += xx if xx
-    #camera.position.y = u[1]
-    camera.position.z += zz if zz
+    camera.translateX xx if xx
+    camera.translateY yy if yy
+    camera.translateZ zz if zz
+    update_deltas()
+    camera.up = camera.worldToLocal up
+    camera.rotation.setX camera.rotation.x + dy
+    camera.rotation.setY camera.rotation.y + dx
     renderer.render scene, camera
     requestAnimationFrame doit
 
