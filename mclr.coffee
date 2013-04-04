@@ -106,7 +106,7 @@ $ ->
   s = 64
   ts = 512
   $('#canvas').attr({width: ts, height: ts})
-  camera.position.z = s * 2.5
+  camera.position.z = s * 0.75
   nsh = s/-2
 
   # Move this in to Sponge? Not sure.
@@ -374,6 +374,7 @@ $ ->
             when 4 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y+1,z), idxvs(x+1,y+1,z), idxvs(x+1,y,z)
             when 5 then new THREE.Face4 idxvs(x,y,z+1), idxvs(x+1,y,z+1), idxvs(x+1,y+1,z+1), idxvs(x,y+1,z+1)
           g.faces.push f
+          g.faceVertexUvs[0].push [new THREE.Vector2(0,0),new THREE.Vector2(0,1),new THREE.Vector2(1,1),new THREE.Vector2(1,0)]
           for _ in [1..4]
             occs_per_vert.push occs_per_node[idx x,y,z][i2]
 
@@ -382,21 +383,38 @@ $ ->
   m = new THREE.Mesh g, new THREE.ShaderMaterial({
     vertexShader: $('#shlightv').text(),
     fragmentShader: $('#shlightf').text(),
-    uniforms: {ScaleFactor: 1.0},
+    uniforms: {t: {type: 't', value: THREE.ImageUtils.loadTexture 'stone.jpg'}, ScaleFactor: 1.0},
     attributes: {ocv: {type: 'f', value: occs_per_vert}}})
   scene.add m
 
   g.computeFaceNormals()
   g.computeVertexNormals()
   g.normalsNeedUpdate = true
+  g.uvsNeedUpdate = true
+  console.log g
+
+  xx = yy = zz = 0
+  $('body').keydown (e) ->
+    switch e.which
+      when 87 then zz = -1
+      when 83 then zz = 1
+      when 65 then xx = -1
+      when 68 then xx = 1
+  $('body').keyup (e) ->
+    switch e.which
+      when 87 then zz = 0
+      when 83 then zz = 0
+      when 65 then xx = 0
+      when 68 then xx = 0
 
   precalc = ([s * Math.sin(i), s * Math.cos(i)] for i in [0.0..2*Math.PI] by 0.0025)
   doit = (t) ->
     u = precalc[Math.floor(t % precalc.length)] or [0,1]
-    camera.position.x = u[0]
-    camera.position.y = u[1]
-    camera.lookAt scene.position
+    camera.position.x += xx if xx
+    #camera.position.y = u[1]
+    camera.position.z += zz if zz
     renderer.render scene, camera
     requestAnimationFrame doit
 
+  camera.lookAt scene.position
   doit 0

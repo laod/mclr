@@ -124,7 +124,7 @@
   };
 
   $(function() {
-    var Ray, Sponge, calc_occs, camera, doit, g, i, idx, idxvs, m, nsh, occs_per_node, occs_per_vert, precalc, rays, renderer, s, scene, sphere_dist, sponge, ts;
+    var Ray, Sponge, calc_occs, camera, doit, g, i, idx, idxvs, m, nsh, occs_per_node, occs_per_vert, precalc, rays, renderer, s, scene, sphere_dist, sponge, ts, xx, yy, zz;
 
     renderer = new THREE.WebGLRenderer();
     camera = new THREE.PerspectiveCamera(45, 400 / 300, 0.1, 10000);
@@ -138,7 +138,7 @@
       width: ts,
       height: ts
     });
-    camera.position.z = s * 2.5;
+    camera.position.z = s * 0.75;
     nsh = s / -2;
     idx = function(x, y, z) {
       return x + y * s + z * s * s;
@@ -480,6 +480,7 @@
               }
             })();
             g.faces.push(f);
+            g.faceVertexUvs[0].push([new THREE.Vector2(0, 0), new THREE.Vector2(0, 1), new THREE.Vector2(1, 1), new THREE.Vector2(1, 0)]);
             _results = [];
             for (_ = _i = 1; _i <= 4; _ = ++_i) {
               _results.push(occs_per_vert.push(occs_per_node[idx(x, y, z)][i2]));
@@ -496,6 +497,10 @@
       vertexShader: $('#shlightv').text(),
       fragmentShader: $('#shlightf').text(),
       uniforms: {
+        t: {
+          type: 't',
+          value: THREE.ImageUtils.loadTexture('stone.jpg')
+        },
         ScaleFactor: 1.0
       },
       attributes: {
@@ -509,6 +514,33 @@
     g.computeFaceNormals();
     g.computeVertexNormals();
     g.normalsNeedUpdate = true;
+    g.uvsNeedUpdate = true;
+    console.log(g);
+    xx = yy = zz = 0;
+    $('body').keydown(function(e) {
+      switch (e.which) {
+        case 87:
+          return zz = -1;
+        case 83:
+          return zz = 1;
+        case 65:
+          return xx = -1;
+        case 68:
+          return xx = 1;
+      }
+    });
+    $('body').keyup(function(e) {
+      switch (e.which) {
+        case 87:
+          return zz = 0;
+        case 83:
+          return zz = 0;
+        case 65:
+          return xx = 0;
+        case 68:
+          return xx = 0;
+      }
+    });
     precalc = (function() {
       var _i, _ref, _results;
 
@@ -522,12 +554,16 @@
       var u;
 
       u = precalc[Math.floor(t % precalc.length)] || [0, 1];
-      camera.position.x = u[0];
-      camera.position.y = u[1];
-      camera.lookAt(scene.position);
+      if (xx) {
+        camera.position.x += xx;
+      }
+      if (zz) {
+        camera.position.z += zz;
+      }
       renderer.render(scene, camera);
       return requestAnimationFrame(doit);
     };
+    camera.lookAt(scene.position);
     return doit(0);
   });
 

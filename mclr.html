@@ -8,11 +8,28 @@
     <script src="three.js"></script>
     <!--<script src="https://raw.github.com/jwagner/simplex-noise.js/master/simplex-noise.js"></script> -->
 
-    <script type="text/glsl" id="shlightf">
+        <script type="text/glsl" id="shlightv">
+attribute float ocv;
 varying vec3 vn;
 varying float occ;
+varying vec2 vuv;
+
+void main()
+{
+  vn = normal;
+  occ = ocv;
+  vuv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+}
+    </script>
+
+<script type="text/glsl" id="shlightf">
+varying vec3 vn;
+varying float occ;
+varying vec2 vuv;
 
 uniform float ScaleFactor;
+uniform sampler2D t;
 
 const float C1 = 0.429043;
 const float C2 = 0.511664;
@@ -62,26 +79,11 @@ void main()
       2.0 * C2 * l.L10  * z
   );
 
-  //gl_FragColor = vec4(d*occ, 1.0);
-
   float r = mix(0.05*d.x,d.x,occ);
-  gl_FragColor = vec4(vec3(r), 1.0);
-  //gl_FragColor = vec4(vec3(occ), 1.0);
+  vec4 tex = texture2D(t,vuv);
+  gl_FragColor = vec4(tex.rgb * r, 1.0);
 }
     </script>
-    <script type="text/glsl" id="shlightv">
-attribute float ocv;
-varying vec3 vn;
-varying float occ;
-
-void main()
-{
-  vn = normal;
-  occ = ocv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-}
-    </script>
-
     <script type="text/glsl" id="occv">
 varying vec2 cu;
 
