@@ -106,187 +106,178 @@ $ ->
   s = 64
   ts = 512
   $('#canvas').attr({width: ts, height: ts})
+  camera.position.z = s * 2.5
   nsh = s/-2
 
-  idxt = (x,y,z,ss) ->
-    ss ||= s
-    x + y*ss + z*ss*ss
-
-  idxa = []
-  do ->
-    for x in [0..s-1]
-      idxa[x] = []
-      for y in [0..s-1]
-        idxa[x][y] = []
-        for z in [0..s-1]
-          idxa[x][y][z] = idxt x,y,z
-
+  # Move this in to Sponge? Not sure.
   idx = (x,y,z) ->
-    idxa[x][y][z]
-
-  cube_loop = (fn) ->
-    r = []
-    for z in [0..s-1]
-      for y in [0..s-1]
-        for x in [0..s-1]
-          r.push fn(x,y,z,idx(x,y,z))
-    r
+    x + y*s + z*s*s
 
   do ->
     v = new THREE.Vector3(nsh,nsh,nsh)
     THREE.Vector3.prototype.repos = _.partial(THREE.Vector3.prototype.add, v)
 
+  class Sponge
+    constructor: (@s) ->
+      @length = @s*@s*@s
+      @_sponge = new Array(@length)
+      @loop (x,y,z) =>
+        tv = new THREE.Vector3(x,y,z).multiplyScalar(1/@s)
+        tv3 = new THREE.Vector3(tv.x+1,tv.y+1,tv.z+1).multiplyScalar(3)
+        tv5 = tv.clone().multiplyScalar(5)
+
+        if tv.y <= 0.8
+          plateau_falloff = 1.0
+        else if tv.y > 0.8 and tv.y < 0.9
+          plateau_falloff = 1.0-(tv.y-0.8)*10.0
+        else
+          plateau_falloff = 0.0
+
+        center_falloff = 0.1/(Math.pow((tv.x-0.5)*1.5, 2) + Math.pow((tv.y-1.0)*0.8, 2) + Math.pow((tv.z-0.5)*1.5, 2))
+
+        caves = Math.pow simplex_noise(1, tv5.x, tv5.y, tv5.z), 3
+        density = simplex_noise(5,tv.x,tv.y/2,tv.z) * plateau_falloff * center_falloff * Math.pow(simplex_noise(1, tv3.x, tv3.y, tv3.z)+0.4, 1.8)
+        density = 0 if caves < 0.5
+        @_sponge[idx x, y, z] = density > 3.1
+
+    lookup: (x,y,z) ->
+      if y == undefined
+        @_sponge[x]
+      else
+        if (x >= 0 and x < @s) and (y >= 0 and y < @s) and (z >= 0 and z < @s) then @_sponge[idx x,y,z] else false
+
+    place: (x,y,z,v) ->
+      if z == undefined
+        @_sponge[x] = y
+      else
+      if (x >= 0 and x < @s) and (y >= 0 and y < @s) and (z >= 0 and z < @s) then @_sponge[idx x,y,z] = v else false
+
+    neighbors: (x,y,z) ->
+      n = [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]]
+      (@lookup i... for i in n)
+
+    loop: (fn) ->
+      for z in [0..@s-1]
+        for y in [0..@s-1]
+          for x in [0..@s-1]
+            fn x, y, z, @lookup(idx(x,y,z))
+
+    loop_flat: (fn) ->
+      for i in [0..@length-1]
+        fn i, @lookup(i)
+
+  sponge = new Sponge(s)
+  console.log sponge
+
+  class Ray
+    constructor: (x, y, z) ->
+      @vector = new THREE.Vector3 x, y, z
+      @rasterize()
+
+    rasterize: ->
+      x = @vector.x; y = @vector.y; z = @vector.z
+      sx = x*0.2
+      sy = y*0.2
+      sz = z*0.2
+  
+      x = if x < 0 then -1 else 1
+      y = if y < 0 then -1 else 1
+      z = if z < 0 then -1 else 1
+  
+      cx = 0
+      cy = 0
+      cz = 0
+  
+      @offsets = new Array(s)
+ 
+      i = 0 
+      while i < s
+        ncx = Math.floor x
+        ncy = Math.floor y
+        ncz = Math.floor z
+        if ncx != cx or ncy != cy or ncz != cz
+          depth = Math.sqrt x*x+y*y+z*z
+          cx = ncx
+          cy = ncy
+          cz = ncz
+          @offsets[i] = new THREE.Vector3(cx, cy, cz)
+          i++
+        x+=sx
+        y+=sy
+        z+=sz
+
   #http://www.softimageblog.com/archives/115
   sphere_dist = (n) ->
-    dist = []
+    dist = new Array(n)
     inc = Math.PI * (3 - Math.sqrt 5)
     o = 2/n
     for i in [1..n]
       y = i * o - 1 + (o/2)
       r = Math.sqrt(1) - y*y
       phi = i * inc
-      dist.push [Math.cos(phi) * r, y, Math.sin(phi) * r]
+      dist[i-1] = new Ray(Math.cos(phi) * r, y, Math.sin(phi) * r)
     dist
 
-  rasterize = (x,y,z) ->
-    sx = x*0.2
-    sy = y*0.2
-    sz = z*0.2
-
-    x = if x < 0 then -1 else 1
-    y = if y < 0 then -1 else 1
-    z = if z < 0 then -1 else 1
-
-    cx = 0
-    cy = 0
-    cz = 0
-
-    points = []
-
-    while points.length < s
-      ncx = Math.floor x
-      ncy = Math.floor y
-      ncz = Math.floor z
-      if ncx != cx or ncy != cy or ncz != cz
-        depth = Math.sqrt x*x+y*y+z*z
-        cx = ncx
-        cy = ncy
-        cz = ncz
-#        points.push [depth, cx, cy, cz]
-        points.push new THREE.Vector3(cx, cy, cz)
-      x+=sx
-      y+=sy
-      z+=sz
-
-    points
-
-  camera.position.z = s * 2.5
-
-  lookup = (c,x,y,z) ->
-    if (x >= 0 and x < s) and (y >= 0 and y < s) and (z >= 0 and z < s) then c[idx x,y,z] else false
-
-  place = (c,x,y,z,v) ->
-    r = [0..s-1]
-    if x in r and y in r and z in r then c[idx x,y,z] = v else false
-
-  neigh = _.memoize (cube,x,y,z) ->
-    n = [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]]
-    (lookup cube, i... for i in n)
-  , ((c,x,y,z) -> [x,y,z].join())
-
-  #console.log 1/s
-  cube = cube_loop (x,y,z) ->
-    tv = new THREE.Vector3(x,y,z).multiplyScalar(1/s)
-    tv3 = new THREE.Vector3(tv.x+1,tv.y+1,tv.z+1).multiplyScalar(3)
-    tv5 = tv.clone().multiplyScalar(5)
-    #console.log tv,tv3,tv5 unless idx(x,y,z) % 1000
-
-    if tv.y <= 0.8
-      plateau_falloff = 1.0
-    else if tv.y > 0.8 and tv.y < 0.9
-      plateau_falloff = 1.0-(tv.y-0.8)*10.0
-    else
-      plateau_falloff = 0.0
-
-    center_falloff = 0.1/(Math.pow((tv.x-0.5)*1.5, 2) + Math.pow((tv.y-1.0)*0.8, 2) + Math.pow((tv.z-0.5)*1.5, 2))
-
-    caves = Math.pow simplex_noise(1, tv5.x, tv5.y, tv5.z), 3
-    density = simplex_noise(5,tv.x,tv.y/2,tv.z) * plateau_falloff * center_falloff * Math.pow(simplex_noise(1, tv3.x, tv3.y, tv3.z)+0.4, 1.8)
-    density = 0 if caves < 0.5
-    density > 3.1
-
-  #place cube,0,0,0,true
-  #place cube,15,15,15,true
-  #console.log lookup(cube,16,15,15)
-
-  console.log cube if s < 5
-
   rays = sphere_dist 50
-  (r.push rasterize(r...), new THREE.Vector3(r...).normalize() for r in rays)
-
-  to_canv = (inp)->
-    canvas = document.getElementById('canvas')
-    canvasWidth  = canvas.width
-    canvasHeight = canvas.height
-    ctx = canvas.getContext('2d')
-    imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight)
-
-    data = imageData.data
-
-    for y in [0..canvasHeight-1]
-      for x in [0..canvasWidth-1]
-        index = (y * canvasWidth + x) * 4
-
-        data[index]   = inp[index]
-        data[++index] = inp[index]
-        data[++index] = inp[index]
-        data[++index] = inp[index]
-
-    ctx.putImageData(imageData, 0, 0)
-
-#  readable test data
-#  cube = []
-#  for x in [0..s-1]
-#    for y in [0..s-1]
-#      for z in [0..s-1]
-#        i = x + y*s + z*s*s
-#        cube[i] = [i,i,i]
-
+#
+#  to_canv = (inp)->
+#    canvas = document.getElementById('canvas')
+#    canvasWidth  = canvas.width
+#    canvasHeight = canvas.height
+#    ctx = canvas.getContext('2d')
+#    imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight)
+#
+#    data = imageData.data
+#
+#    for y in [0..canvasHeight-1]
+#      for x in [0..canvasWidth-1]
+#        index = (y * canvasWidth + x) * 4
+#
+#        data[index]   = inp[index]
+#        data[++index] = inp[index]
+#        data[++index] = inp[index]
+#        data[++index] = inp[index]
+#
+#    ctx.putImageData(imageData, 0, 0)
+#
+##  readable test data
+##  cube = []
+##  for x in [0..s-1]
+##    for y in [0..s-1]
+##      for z in [0..s-1]
+##        i = x + y*s + z*s*s
+##        cube[i] = [i,i,i]
+#
   calc_occs = ->
     r = new THREE.WebGLRenderer({preserveDrawingBuffer: true})
     r.setSize ts, ts
     #$('body').prepend(r.domElement)
 
-    #console.log cube
-
     derp = []
-    for sub in cube
-      if sub then derp.push 255,255,255,255 else derp.push 0,0,0,255
+    sponge.loop_flat (i,cube) ->
+      if cube then derp.push 255,255,255,255 else derp.push 0,0,0,255
     for i in [1..ts*ts*4-derp.length]
       derp.push 0,0,0,255
 
     input = new Uint8Array(derp)
-    #console.log "input non zero", _.filter(input,((e,i) -> i%4 != 3 and e > 0)).length
+    console.log "input non zero", _.filter(input,((e,i) -> i%4 != 3 and e > 0)).length
     #to_canv input
     t = new THREE.DataTexture input, ts, ts, THREE.RGBAFormat, THREE.UnsignedByteType, new THREE.UVMapping(), undefined, undefined, THREE.NearestFilter, THREE.NearestFilter
     t.needsUpdate = true
 
-    rs = rays[0][3]
-    #rs = (new THREE.Vector3 0,0,0 for i in [1..64])
-
-    u = {
-      t: {type: 't', value: t},
-      s: {type: 'f', value: s},
-      ts: {type: 'f', value: ts},
-      rayoffs: {type: 'v3v', value: rs}}
+    rs = rays[0].offsets
 
     sc = new THREE.Scene()
     g = new THREE.PlaneGeometry(2,2)
     m = new THREE.Mesh g, new THREE.ShaderMaterial({
-      uniforms: u,
+      uniforms: {
+        t: {type: 't', value: t},
+        s: {type: 'f', value: s},
+        ts: {type: 'f', value: ts},
+        rayoffs: {type: 'v3v', value: rs}},
       vertexShader: $('#occv').text(),
       fragmentShader: $('#occf').text().replace('rayoffs[64]',"rayoffs[#{s}]").replace('r < 64',"r < #{s}")})
-    #console.log m
+    console.log m
     sc.add m
 
     #tgt = new THREE.WebGLRenderTarget()
@@ -306,20 +297,15 @@ $ ->
 
     gl = r.getContext()
     for ray,ray_index in rays
-      #console.log ray_index unless ray_index % 10
-      console.log ray_index
-      u.rayoffs.value = ray[3]
+      console.log ray_index unless ray_index % 10
+      m.material.uniforms.rayoffs.value = ray.offsets
 
       #r.render sc, camera, tgt
-      console.log "render gooo"
       r.render sc, camera
-      console.log "render end"
-      console.log "read gooo"
       gl.readPixels(0,0,ts,ts,gl.RGBA,gl.UNSIGNED_BYTE,output)
-      console.log "read end"
 
       # validate coordinate xforms
-      #cube_loop (x,y,z,i) ->
+      #sponge.loop (x,y,z,i) ->
       #  [x1,y1,z1] = to_xyz i % ts, Math.floor(i/ts)
       #  console.log "fail x", i unless x == x1 and y == y1 and z == z1
 
@@ -336,11 +322,10 @@ $ ->
       #  #  console.log "good", opidx
       #console.log "total failed", failed
       #to_canv output
-      console.log "total gooo"
       for comp,l in output by 4
         l4 = l/4
         occ[l4] = [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]] if ray_index == 0
-        x = ray[4].x; y = ray[4].y; z = ray[4].z
+        x = ray.vector.x; y = ray.vector.y; z = ray.vector.z
         if x < 0
           occ[l4][0][0] -= x
           occ[l4][0][1] -= x if comp > 0
@@ -359,7 +344,6 @@ $ ->
         if z > 0
           occ[l4][5][0] += z
           occ[l4][5][1] += z if comp > 0
-      console.log "total end"
 
     o = []
     for cube_faces in occ
@@ -370,16 +354,7 @@ $ ->
     o
 
   occs_per_node = calc_occs()
-#
-#        console.log "tess cube occs", occs_per_node[idx 30,30,31]
-#        console.log "tess cube occs", occs_per_node[idx 31,30,31]
-#        console.log "tess cube occs", occs_per_node[idx 30,31,31]
-#
-#        tp = [0,0,0]
-#        #console.log "cube @ ", tp, lookup(cube,tp...)
-#        #console.log "idx @ ", tp, idx(tp...)
-#        #console.log "neigh @ ", tp, neigh(cube,tp...)
-#
+
   g = new THREE.Geometry()
 
   idxvs = (x,y,z) ->
@@ -387,9 +362,9 @@ $ ->
     g.vertices.length - 1
 
   occs_per_vert = []
-  cube_loop (x,y,z,i) ->
-    if cube[i]
-      _.each neigh(cube,x,y,z), (e2,i2) -> 
+  sponge.loop (x,y,z,cube) ->
+    if cube
+      _.each sponge.neighbors(x,y,z), (e2,i2) -> 
         unless e2[0]
           f = switch i2
             when 0 then new THREE.Face4 idxvs(x,y,z), idxvs(x,y,z+1), idxvs(x,y+1,z+1), idxvs(x,y+1,z)

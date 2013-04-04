@@ -31,3 +31,4 @@ To-do
  * Improve ao parallelism and move to progressive refinement
  * Gamma correction?
  * understand windows js memory limits (s=128, ts=2048)
+ * understand why shaders break at s=128
