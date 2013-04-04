@@ -124,10 +124,10 @@
   };
 
   $(function() {
-    var Ray, Sponge, calc_occs, camera, doit, dx, dy, g, i, idx, idxvs, last, m, nsh, occs_per_node, occs_per_vert, pos, precalc, rays, renderer, s, samples, scene, sphere_dist, sponge, track, ts, up, update_deltas, xx, yy, zz;
+    var Ray, Sponge, calc_occs, camera, doit, dx, dy, g, i, idx, idxvs, last, m, nsh, occs_per_node, occs_per_vert, pos, precalc, rays, renderer, s, samples, scene, sphere_dist, sponge, track, ts, update_deltas, xx, yy, zz;
 
     renderer = new THREE.WebGLRenderer();
-    camera = new THREE.PerspectiveCamera(45, 400 / 300, 0.1, 10000);
+    camera = new THREE.PerspectiveCamera(90, 400 / 300, 0.1, 10000);
     scene = new THREE.Scene();
     renderer.setClearColor(new THREE.Color(0, 1));
     renderer.setSize(800, 600);
@@ -138,7 +138,6 @@
       width: ts,
       height: ts
     });
-    camera.position.z = s * 0.75;
     nsh = s / -2;
     idx = function(x, y, z) {
       return x + y * s + z * s * s;
@@ -571,7 +570,8 @@
         return dx = dy = 0;
       }
     };
-    up = new THREE.Vector3(0, 1, 0);
+    camera.position.z = s * 0.75;
+    camera.eulerOrder = 'YXZ';
     precalc = (function() {
       var _i, _ref, _results;
 
@@ -595,13 +595,11 @@
         camera.translateZ(zz);
       }
       update_deltas();
-      camera.up = camera.worldToLocal(up);
-      camera.rotation.setX(camera.rotation.x + dy);
-      camera.rotation.setY(camera.rotation.y + dx);
+      camera.rotation.y += dx;
+      camera.rotation.x += dy;
       renderer.render(scene, camera);
       return requestAnimationFrame(doit);
     };
-    camera.lookAt(scene.position);
     return doit(0);
   });
 

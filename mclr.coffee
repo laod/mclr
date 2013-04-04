@@ -97,7 +97,7 @@ window.simplex_noise = (octaves, x, y, z) ->
 
 $ ->
   renderer = new THREE.WebGLRenderer()
-  camera = new THREE.PerspectiveCamera 45, 400/300, 0.1, 10000
+  camera = new THREE.PerspectiveCamera 90, 400/300, 0.1, 10000
   scene = new THREE.Scene()
   renderer.setClearColor new THREE.Color(0, 1)
   renderer.setSize 800, 600
@@ -106,7 +106,6 @@ $ ->
   s = 64
   ts = 512
   $('#canvas').attr({width: ts, height: ts})
-  camera.position.z = s * 0.75
   nsh = s/-2
 
   # Move this in to Sponge? Not sure.
@@ -429,7 +428,8 @@ $ ->
     else
       dx = dy = 0
 
-  up = new THREE.Vector3(0,1,0)
+  camera.position.z = s * 0.75
+  camera.eulerOrder = 'YXZ'
   precalc = ([s * Math.sin(i), s * Math.cos(i)] for i in [0.0..2*Math.PI] by 0.0025)
   doit = (t) ->
     u = precalc[Math.floor(t % precalc.length)] or [0,1]
@@ -437,11 +437,9 @@ $ ->
     camera.translateY yy if yy
     camera.translateZ zz if zz
     update_deltas()
-    camera.up = camera.worldToLocal up
-    camera.rotation.setX camera.rotation.x + dy
-    camera.rotation.setY camera.rotation.y + dx
+    camera.rotation.y += dx
+    camera.rotation.x += dy
     renderer.render scene, camera
     requestAnimationFrame doit
 
-  camera.lookAt scene.position
   doit 0
