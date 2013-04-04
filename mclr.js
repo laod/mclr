@@ -126,7 +126,7 @@
   };
 
   $(function() {
-    var buried, burieda, calc_occs, camera, cube, cube_loop, doit, g, i, idx, idxa, idxt, idxvs, lookup, m, neigh, nsh, occs_per_node, occs_per_vert, place, precalc, r, rasterize, rays, renderer, s, scene, sphere_dist, to_canv, ts, _i, _len;
+    var calc_occs, camera, cube, cube_loop, doit, g, i, idx, idxa, idxt, idxvs, lookup, m, neigh, nsh, occs_per_node, occs_per_vert, place, precalc, r, rasterize, rays, renderer, s, scene, sphere_dist, to_canv, ts, _i, _len;
 
     renderer = new THREE.WebGLRenderer();
     camera = new THREE.PerspectiveCamera(45, 400 / 300, 0.1, 10000);
@@ -231,7 +231,7 @@
           cx = ncx;
           cy = ncy;
           cz = ncz;
-          points.push([cx, cy, cz]);
+          points.push(new THREE.Vector3(cx, cy, cz));
         }
         x += sx;
         y += sy;
@@ -293,56 +293,11 @@
       if (caves < 0.5) {
         density = 0;
       }
-      if (density > 3.1) {
-        return [x * 25.5, y * 25.5, z * 25.5];
-      } else {
-        return [0, 0, 0];
-      }
+      return density > 3.1;
     });
     if (s < 5) {
       console.log(cube);
     }
-    burieda = [];
-    (function() {
-      var n, x, y, z, _i, _ref, _results;
-
-      _results = [];
-      for (x = _i = 0, _ref = s - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; x = 0 <= _ref ? ++_i : --_i) {
-        burieda[x] = [];
-        _results.push((function() {
-          var _j, _ref1, _results1;
-
-          _results1 = [];
-          for (y = _j = 0, _ref1 = s - 1; 0 <= _ref1 ? _j <= _ref1 : _j >= _ref1; y = 0 <= _ref1 ? ++_j : --_j) {
-            burieda[x][y] = [];
-            _results1.push((function() {
-              var _k, _ref2, _results2;
-
-              _results2 = [];
-              for (z = _k = 0, _ref2 = s - 1; 0 <= _ref2 ? _k <= _ref2 : _k >= _ref2; z = 0 <= _ref2 ? ++_k : --_k) {
-                _results2.push(burieda[x][y][z] = _.all((function() {
-                  var _l, _len, _ref3, _results3;
-
-                  _ref3 = neigh(cube, x, y, z);
-                  _results3 = [];
-                  for (_l = 0, _len = _ref3.length; _l < _len; _l++) {
-                    n = _ref3[_l];
-                    _results3.push(n[0]);
-                  }
-                  return _results3;
-                })()));
-              }
-              return _results2;
-            })());
-          }
-          return _results1;
-        })());
-      }
-      return _results;
-    })();
-    buried = function(x, y, z) {
-      return burieda[x][y][z];
-    };
     rays = sphere_dist(50);
     for (_i = 0, _len = rays.length; _i < _len; _i++) {
       r = rays[_i];
@@ -373,18 +328,20 @@
       return ctx.putImageData(imageData, 0, 0);
     };
     calc_occs = function() {
-      var comp, contrib, cube_faces, cube_index, derp, extract, face, face_index, face_names, fhj, g, gl, i, input, j, jm2, jm2fhj, l, l4, m, maybeabs, o, occ, output, ray, ray_index, roffs, rs, sc, sub, t, tests, to_xyz, u, _j, _k, _l, _len1, _len2, _len3, _len4, _len5, _len6, _m, _n, _o, _p, _q, _ref, _ref1, _ref2;
+      var comp, cube_faces, derp, face, g, gl, i, input, l, l4, m, o, occ, output, ray, ray_index, rs, sc, sub, t, to_xyz, u, x, y, z, _j, _k, _l, _len1, _len2, _len3, _len4, _len5, _m, _n, _o, _ref;
 
       r = new THREE.WebGLRenderer({
         preserveDrawingBuffer: true
       });
       r.setSize(ts, ts);
-      $('body').prepend(r.domElement);
-      console.log(cube);
       derp = [];
       for (_j = 0, _len1 = cube.length; _j < _len1; _j++) {
         sub = cube[_j];
-        derp.push.apply(derp, __slice.call(sub).concat([255]));
+        if (sub) {
+          derp.push(255, 255, 255, 255);
+        } else {
+          derp.push(0, 0, 0, 255);
+        }
       }
       for (i = _k = 1, _ref = ts * ts * 4 - derp.length; 1 <= _ref ? _k <= _ref : _k >= _ref; i = 1 <= _ref ? ++_k : --_k) {
         derp.push(0, 0, 0, 255);
@@ -392,21 +349,7 @@
       input = new Uint8Array(derp);
       t = new THREE.DataTexture(input, ts, ts, THREE.RGBAFormat, THREE.UnsignedByteType, new THREE.UVMapping(), void 0, void 0, THREE.NearestFilter, THREE.NearestFilter);
       t.needsUpdate = true;
-      rs = (function() {
-        var _l, _len2, _ref1, _results;
-
-        _ref1 = rays[0][3];
-        _results = [];
-        for (_l = 0, _len2 = _ref1.length; _l < _len2; _l++) {
-          roffs = _ref1[_l];
-          _results.push((function(func, args, ctor) {
-            ctor.prototype = func.prototype;
-            var child = new ctor, result = func.apply(child, args);
-            return Object(result) === result ? result : child;
-          })(THREE.Vector3, roffs, function(){}));
-        }
-        return _results;
-      })();
+      rs = rays[0][3];
       u = {
         t: {
           type: 't',
@@ -430,48 +373,11 @@
       m = new THREE.Mesh(g, new THREE.ShaderMaterial({
         uniforms: u,
         vertexShader: $('#occv').text(),
-        fragmentShader: $('#occf').text()
+        fragmentShader: $('#occf').text().replace('rayoffs[64]', "rayoffs[" + s + "]").replace('r < 64', "r < " + s)
       }));
-      console.log(m);
       sc.add(m);
       output = new Uint8Array(ts * ts * 4);
-      tests = [
-        (function(a, b) {
-          return a < b;
-        }), (function(a, b) {
-          return a > b;
-        })
-      ];
-      maybeabs = [
-        (function(a) {
-          return Math.abs(a);
-        }), (function(a) {
-          return a;
-        })
-      ];
-      extract = [
-        (function(a) {
-          return a[4].x;
-        }), (function(a) {
-          return a[4].y;
-        }), (function(a) {
-          return a[4].z;
-        })
-      ];
-      face_names = ['left', 'right', 'top', 'bottom', 'back', 'front'];
-      jm2fhj = (function() {
-        var _l, _results;
-
-        _results = [];
-        for (j = _l = 0; _l <= 5; j = ++_l) {
-          _results.push([j, j % 2, Math.floor(j / 2)]);
-        }
-        return _results;
-      })();
-      occ = [];
-      for (cube_index = _l = 0, _ref1 = s * s * s - 1; 0 <= _ref1 ? _l <= _ref1 : _l >= _ref1; cube_index = 0 <= _ref1 ? ++_l : --_l) {
-        occ.push([[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]);
-      }
+      occ = new Array(ts * ts);
       to_xyz = function(cux, cuy) {
         var cox, coy, coz, fidx;
 
@@ -484,50 +390,71 @@
         return [cox, coy, coz];
       };
       gl = r.getContext();
-      for (ray_index = _m = 0, _len2 = rays.length; _m < _len2; ray_index = ++_m) {
+      for (ray_index = _l = 0, _len2 = rays.length; _l < _len2; ray_index = ++_l) {
         ray = rays[ray_index];
-        if (!(ray_index % 10)) {
-          console.log(ray_index);
-        }
-        u.rayoffs.value = (function() {
-          var _len3, _n, _ref2, _results;
-
-          _ref2 = rays[ray_index][3];
-          _results = [];
-          for (_n = 0, _len3 = _ref2.length; _n < _len3; _n++) {
-            roffs = _ref2[_n];
-            _results.push((function(func, args, ctor) {
-              ctor.prototype = func.prototype;
-              var child = new ctor, result = func.apply(child, args);
-              return Object(result) === result ? result : child;
-            })(THREE.Vector3, roffs, function(){}));
-          }
-          return _results;
-        })();
+        console.log(ray_index);
+        u.rayoffs.value = ray[3];
+        console.log("render gooo");
         r.render(sc, camera);
+        console.log("render end");
+        console.log("read gooo");
         gl.readPixels(0, 0, ts, ts, gl.RGBA, gl.UNSIGNED_BYTE, output);
-        for (l = _n = 0, _len3 = output.length; _n < _len3; l = _n += 4) {
+        console.log("read end");
+        console.log("total gooo");
+        for (l = _m = 0, _len3 = output.length; _m < _len3; l = _m += 4) {
           comp = output[l];
-          for (_o = 0, _len4 = jm2fhj.length; _o < _len4; _o++) {
-            _ref2 = jm2fhj[_o], face_index = _ref2[0], jm2 = _ref2[1], fhj = _ref2[2];
-            j = extract[fhj](ray);
-            if (tests[jm2](j, 0)) {
-              contrib = maybeabs[jm2](j);
-              l4 = l / 4;
-              occ[l4][face_index][0] += contrib;
-              if (comp > 0) {
-                occ[l4][face_index][1] += contrib;
-              }
+          l4 = l / 4;
+          if (ray_index === 0) {
+            occ[l4] = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]];
+          }
+          x = ray[4].x;
+          y = ray[4].y;
+          z = ray[4].z;
+          if (x < 0) {
+            occ[l4][0][0] -= x;
+            if (comp > 0) {
+              occ[l4][0][1] -= x;
+            }
+          }
+          if (x > 0) {
+            occ[l4][1][0] += x;
+            if (comp > 0) {
+              occ[l4][1][1] += x;
+            }
+          }
+          if (y < 0) {
+            occ[l4][2][0] -= y;
+            if (comp > 0) {
+              occ[l4][2][1] -= y;
+            }
+          }
+          if (y > 0) {
+            occ[l4][3][0] += y;
+            if (comp > 0) {
+              occ[l4][3][1] += y;
+            }
+          }
+          if (z < 0) {
+            occ[l4][4][0] -= z;
+            if (comp > 0) {
+              occ[l4][4][1] -= z;
+            }
+          }
+          if (z > 0) {
+            occ[l4][5][0] += z;
+            if (comp > 0) {
+              occ[l4][5][1] += z;
             }
           }
         }
+        console.log("total end");
       }
       o = [];
-      for (_p = 0, _len5 = occ.length; _p < _len5; _p++) {
-        cube_faces = occ[_p];
+      for (_n = 0, _len4 = occ.length; _n < _len4; _n++) {
+        cube_faces = occ[_n];
         t = [];
-        for (_q = 0, _len6 = cube_faces.length; _q < _len6; _q++) {
-          face = cube_faces[_q];
+        for (_o = 0, _len5 = cube_faces.length; _o < _len5; _o++) {
+          face = cube_faces[_o];
           t.push(face[0] && face[1] ? face[1] / face[0] : 0);
         }
         o.push(t);
@@ -542,7 +469,7 @@
     };
     occs_per_vert = [];
     cube_loop(function(x, y, z, i) {
-      if (cube[i][0]) {
+      if (cube[i]) {
         return _.each(neigh(cube, x, y, z), function(e2, i2) {
           var f, _, _j, _results;
 

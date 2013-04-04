@@ -173,7 +173,7 @@ $ ->
         cy = ncy
         cz = ncz
 #        points.push [depth, cx, cy, cz]
-        points.push [cx, cy, cz]
+        points.push new THREE.Vector3(cx, cy, cz)
       x+=sx
       y+=sy
       z+=sz
@@ -213,25 +213,13 @@ $ ->
     caves = Math.pow simplex_noise(1, tv5.x, tv5.y, tv5.z), 3
     density = simplex_noise(5,tv.x,tv.y/2,tv.z) * plateau_falloff * center_falloff * Math.pow(simplex_noise(1, tv3.x, tv3.y, tv3.z)+0.4, 1.8)
     density = 0 if caves < 0.5
-    if density > 3.1 then [x*25.5,y*25.5,z*25.5] else [0,0,0]
+    density > 3.1
 
   #place cube,0,0,0,true
   #place cube,15,15,15,true
   #console.log lookup(cube,16,15,15)
 
   console.log cube if s < 5
-
-  burieda = []
-  do ->
-    for x in [0..s-1]
-      burieda[x] = []
-      for y in [0..s-1]
-        burieda[x][y] = []
-        for z in [0..s-1]
-          burieda[x][y][z] = _.all((n[0] for n in neigh(cube,x,y,z)))
-
-  buried = (x,y,z) ->
-    burieda[x][y][z]
 
   rays = sphere_dist 50
   (r.push rasterize(r...), new THREE.Vector3(r...).normalize() for r in rays)
@@ -267,13 +255,13 @@ $ ->
   calc_occs = ->
     r = new THREE.WebGLRenderer({preserveDrawingBuffer: true})
     r.setSize ts, ts
-    $('body').prepend(r.domElement)
+    #$('body').prepend(r.domElement)
 
-    console.log cube
+    #console.log cube
 
     derp = []
     for sub in cube
-      derp.push sub...,255
+      if sub then derp.push 255,255,255,255 else derp.push 0,0,0,255
     for i in [1..ts*ts*4-derp.length]
       derp.push 0,0,0,255
 
@@ -283,7 +271,7 @@ $ ->
     t = new THREE.DataTexture input, ts, ts, THREE.RGBAFormat, THREE.UnsignedByteType, new THREE.UVMapping(), undefined, undefined, THREE.NearestFilter, THREE.NearestFilter
     t.needsUpdate = true
 
-    rs = (new THREE.Vector3 roffs... for roffs in rays[0][3])
+    rs = rays[0][3]
     #rs = (new THREE.Vector3 0,0,0 for i in [1..64])
 
     u = {
@@ -297,23 +285,15 @@ $ ->
     m = new THREE.Mesh g, new THREE.ShaderMaterial({
       uniforms: u,
       vertexShader: $('#occv').text(),
-      fragmentShader: $('#occf').text()})
-    console.log m
+      fragmentShader: $('#occf').text().replace('rayoffs[64]',"rayoffs[#{s}]").replace('r < 64',"r < #{s}")})
+    #console.log m
     sc.add m
 
     #tgt = new THREE.WebGLRenderTarget()
     #tgt.width = tgt.height = s
     output = new Uint8Array ts*ts*4
 
-    tests = [((a,b) -> a < b),((a,b) -> a > b)]
-    maybeabs = [((a) -> Math.abs a),((a) -> a)]
-    extract = [((a) -> a[4].x),((a) -> a[4].y),((a) -> a[4].z)]
-    face_names = ['left','right','top','bottom','back','front']
-    jm2fhj = ([j, j % 2, Math.floor j/2] for j in [0..5])
-
-    occ = []
-    for cube_index in [0..s*s*s-1]
-      occ.push [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
+    occ = new Array(ts*ts)
 
     to_xyz = (cux,cuy) ->
       fidx = cux + cuy * ts
@@ -326,12 +306,17 @@ $ ->
 
     gl = r.getContext()
     for ray,ray_index in rays
-      console.log ray_index unless ray_index % 10
-      u.rayoffs.value = (new THREE.Vector3 roffs... for roffs in rays[ray_index][3])
+      #console.log ray_index unless ray_index % 10
+      console.log ray_index
+      u.rayoffs.value = ray[3]
 
       #r.render sc, camera, tgt
+      console.log "render gooo"
       r.render sc, camera
+      console.log "render end"
+      console.log "read gooo"
       gl.readPixels(0,0,ts,ts,gl.RGBA,gl.UNSIGNED_BYTE,output)
+      console.log "read end"
 
       # validate coordinate xforms
       #cube_loop (x,y,z,i) ->
@@ -351,14 +336,30 @@ $ ->
       #  #  console.log "good", opidx
       #console.log "total failed", failed
       #to_canv output
+      console.log "total gooo"
       for comp,l in output by 4
-        for [face_index, jm2, fhj] in jm2fhj
-          j = extract[fhj](ray)
-          if tests[jm2](j,0)
-            contrib = maybeabs[jm2](j)
-            l4 = l/4
-            occ[l4][face_index][0] += contrib
-            occ[l4][face_index][1] += contrib if comp > 0
+        l4 = l/4
+        occ[l4] = [[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]] if ray_index == 0
+        x = ray[4].x; y = ray[4].y; z = ray[4].z
+        if x < 0
+          occ[l4][0][0] -= x
+          occ[l4][0][1] -= x if comp > 0
+        if x > 0
+          occ[l4][1][0] += x
+          occ[l4][1][1] += x if comp > 0
+        if y < 0
+          occ[l4][2][0] -= y
+          occ[l4][2][1] -= y if comp > 0
+        if y > 0
+          occ[l4][3][0] += y
+          occ[l4][3][1] += y if comp > 0
+        if z < 0
+          occ[l4][4][0] -= z
+          occ[l4][4][1] -= z if comp > 0
+        if z > 0
+          occ[l4][5][0] += z
+          occ[l4][5][1] += z if comp > 0
+      console.log "total end"
 
     o = []
     for cube_faces in occ
@@ -387,7 +388,7 @@ $ ->
 
   occs_per_vert = []
   cube_loop (x,y,z,i) ->
-    if cube[i][0]
+    if cube[i]
       _.each neigh(cube,x,y,z), (e2,i2) -> 
         unless e2[0]
           f = switch i2
