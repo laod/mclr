@@ -1,5 +1,7 @@
 This is a coffeescript implementation of Florian Boesch's [Minecraft Like Rendering Experiments](http://codeflow.org/entries/2010/dec/09/minecraft-like-rendering-experiments-in-opengl-4/). Thanks to him for the inspiration and code.
 
+["Working" Example](http://loophole.morpheus.net/o17.html)
+
 Warning
 -------
 
