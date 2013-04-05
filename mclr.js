@@ -129,7 +129,7 @@
     renderer = new THREE.WebGLRenderer();
     camera = new THREE.PerspectiveCamera(90, 400 / 300, 0.1, 10000);
     scene = new THREE.Scene();
-    renderer.setClearColor(new THREE.Color(0, 1));
+    renderer.setClearColor(new THREE.Color('#fff'));
     renderer.setSize(800, 600);
     $("body").append(renderer.domElement);
     s = 64;
@@ -499,6 +499,10 @@
         t: {
           type: 't',
           value: THREE.ImageUtils.loadTexture('stone.jpg')
+        },
+        t2: {
+          type: 't',
+          value: THREE.ImageUtils.loadTexture('grass.jpg')
         },
         ScaleFactor: 1.0
       },
