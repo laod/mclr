@@ -13,15 +13,12 @@ attribute float ocv;
 varying vec3 vn;
 varying float occ;
 varying vec2 vuv;
-varying float w;
 
 void main()
 {
   vn = normal;
   occ = ocv;
   vuv = uv;
-  w = 0.0;
-  if(vn.y > 0.0) w = 1.0;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
 }
     </script>
@@ -30,7 +27,6 @@ void main()
 varying vec3 vn;
 varying float occ;
 varying vec2 vuv;
-varying float w;
 
 uniform float ScaleFactor;
 uniform sampler2D t;
@@ -89,10 +85,8 @@ void main()
   );
 
   float r = mix(0.05*d.x,d.x,occ);
-  vec4 tex;
-  if(w == 0.0){
-    tex = texture2D(t,vuv);
-  } else if (w == 1.0){
+  vec4 tex = texture2D(t,vuv);
+  if(vn.y > 0.0){
     tex = texture2D(t2,vuv);
   }
   gl_FragColor = vec4(gamma(tex.rgb * r), 1.0);
@@ -165,6 +159,7 @@ void main()
   </head>
 
   <body>
+    <p>WASD, space, and Mouse1 + drag.</p>
     <canvas id="canvas" width="4" height="4" style="display: none;"></canvas>
   </body>
   <script src="mclr.js"></script>
